@@ -1,0 +1,25 @@
+#custom-build-badge {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 2147483647;
+  pointer-events: none;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #f8fafc;
+  font:
+    700 11px/1.1 "Segoe UI",
+    system-ui,
+    sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+}
+
+html[data-mode="dark"] #custom-build-badge {
+  border-color: rgba(248, 250, 252, 0.14);
+  background: rgba(248, 250, 252, 0.94);
+  color: #0f172a;
+}
