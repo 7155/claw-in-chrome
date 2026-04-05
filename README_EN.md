@@ -20,7 +20,7 @@ This extension is mainly used to:
 - chat in the side panel
 - connect your own model API
 - choose `OpenAI Chat Completions` or `OpenAI Responses API`
-- export logs for troubleshooting
+
 
 ## 1. Install
 
@@ -32,20 +32,18 @@ This extension is mainly used to:
 
 ## 2. Configure
 
-Open the extension options page first, then go to `模型供应商` on the left.
+Open the extension options page first, then go to `Model provider` on the left.
 
 After creating a profile, mainly fill in these fields:
 
-- `供应商格式`
+- `Provider format`
 - `Base URL`
 - `API Key`
-- `模型`
+- `Model`
 
-After that, click `保存并应用`, then close and reopen the side panel. Once that is done, you are ready to use it.
+After that, click `Save and apply`, then close and reopen the side panel. Once that is done, you are ready to use it.
 
-![Provider settings](./docs/screenshots/02.png)
-
-##  Star 历史
+![Provider settings](./docs/screenshots/05.png)
 
 ## Star History
 

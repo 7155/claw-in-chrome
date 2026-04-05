@@ -20,7 +20,6 @@
 - 在侧边栏里聊天
 - 接入你自己的模型接口
 - 选择 `OpenAI Chat Completions` 或 `OpenAI Responses API`
-- 导出日志排查问题
 
 ![侧边栏聊天界面](./docs/screenshots/03.png)
 
@@ -39,7 +38,6 @@
 新增一套配置后，主要填写这几项：
 
 - `供应商格式`
-
 - `Base URL`
 - `API Key`
 - `模型`
@@ -49,9 +47,7 @@
 ![模型供应商配置页](./docs/screenshots/02.png)
 
 
-
 ##  Star 历史
 
-## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=S-Trespassing/claw-in-chrome&type=date&legend=top-left)](https://www.star-history.com/#S-Trespassing/claw-in-chrome&type=date&legend=top-left)
