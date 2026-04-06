@@ -87789,13 +87789,15 @@ function CQ({
         return;
       }
       const r = !!P?.enabled && !!P?.baseUrl;
-      const o = r ? P.baseUrl : he.apiBaseUrl;
+      const __cpCustomProviderFormat = __cpNormalizeProviderFormat(P?.format, P?.baseUrl);
+      const o = r ? __cpNormalizeAnthropicClientBaseUrl(__cpCustomProviderFormat, P.baseUrl) : he.apiBaseUrl;
       const a = r ? P.apiKey || e : e;
       __cpPanelDebugLog("chat.client_bootstrap", {
         sessionId: s,
         tabId: c,
         currentModel: i,
         resolvedBaseUrl: o,
+        resolvedProviderFormat: __cpCustomProviderFormat,
         customProvider: __cpPanelDebugMaskProvider(P),
         hasResolvedApiKey: !!a,
         hasAuthToken: !!t,
@@ -90704,6 +90706,16 @@ function __cpNormalizeProviderFormat(e, t) {
     return "openai_chat";
   }
   return "anthropic";
+}
+function __cpNormalizeAnthropicClientBaseUrl(e, t) {
+  let n = String(t || "").trim().replace(/\/+$/, "");
+  if (!n || __cpNormalizeProviderFormat(e, n) !== "anthropic") {
+    return n;
+  }
+  n = n.replace(/\/v1\/messages$/i, "");
+  n = n.replace(/\/messages$/i, "");
+  n = n.replace(/\/v1$/i, "");
+  return n;
 }
 function __cpHashProviderCacheKey(e) {
   let t = 2166136261;

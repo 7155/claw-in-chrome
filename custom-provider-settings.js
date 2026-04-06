@@ -734,6 +734,35 @@
     }
     return text.slice(0, limit) + "...";
   }
+  function appendStatusCodeSuffix(fallback, code) {
+    if (!fallback) {
+      return code;
+    }
+    return /[\u4e00-\u9fff]/.test(fallback) ? `${fallback}（${code}）` : `${fallback} (${code})`;
+  }
+  function compactStatusMessage(message, fallback) {
+    const fallbackText = typeof fallback === "string" ? fallback.trim() : "";
+    if (typeof message !== "string") {
+      return fallbackText;
+    }
+    const raw = message.trim();
+    if (!raw) {
+      return fallbackText;
+    }
+    const normalized = raw.replace(/\s+/g, " ").trim();
+    const statusCodeMatch = normalized.match(/\b([45]\d{2})\b/);
+    const hasHtml = /<!doctype|<html|<head|<body|<title|<center|<h1|<hr\b|<\/?[a-z][\s\S]*>/i.test(raw);
+    if (hasHtml) {
+      return statusCodeMatch ? appendStatusCodeSuffix(fallbackText, statusCodeMatch[1]) : fallbackText;
+    }
+    if (!normalized) {
+      return fallbackText;
+    }
+    if (normalized.length > 120) {
+      return statusCodeMatch ? appendStatusCodeSuffix(fallbackText, statusCodeMatch[1]) : fallbackText;
+    }
+    return normalized;
+  }
   const syncModelOptions = function (select, models, selectedValue) {
     if (!select) {
       return;
@@ -1863,6 +1892,9 @@
   }
   function setStatus(node, kind, message) {
     node.dataset.kind = kind || "";
+    if (node.classList.contains("cp-page-meta")) {
+      node.dataset.tone = kind === "success" ? "ready" : kind === "error" ? "error" : kind === "loading" ? "loading" : "";
+    }
     node.textContent = message || "";
   }
   async function saveConfig(next, state) {
@@ -2224,7 +2256,6 @@
     contextWindowShell.appendChild(contextWindowStepper);
     reasoningControlRow.appendChild(contextWindowShell);
     reasoningField.appendChild(reasoningControlRow);
-    const status = createNode("div", "cp-page-status");
     const saveButton = createNode("button", "cp-provider-floating-btn px-6 py-3 bg-brand-100 text-oncolor-100 rounded-xl hover:bg-brand-100/90 transition-all font-large disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2", strings.saveAndApply);
     saveButton.type = "submit";
     saveButton.setAttribute("form", form.id);
@@ -2265,7 +2296,6 @@
     form.appendChild(apiKeyField);
     form.appendChild(modelField);
     form.appendChild(reasoningField);
-    form.appendChild(status);
     stack.appendChild(header);
     editorView.appendChild(editorToolbar);
     editorView.appendChild(form);
@@ -2498,7 +2528,7 @@
       const nextK = Math.max(Math.ceil(MIN_CONTEXT_WINDOW / 1000), baseK + deltaK);
       contextWindowInput.value = formatContextWindowForInput(normalizeContextWindow(nextK * 1000, DEFAULT_CONTEXT_WINDOW));
       contextWindowInput.style.width = getContextWindowInputWidth(contextWindowInput.value, contextWindowInput.placeholder);
-      setStatus(status, "", "");
+      setEditorStatus("", "");
     }
     function getProfileDisplayName(profile, index) {
       const name = String(profile?.name || "").trim();
@@ -3001,7 +3031,7 @@
       closeManualModelDialog();
       state.editorMode = "list";
       state.editingProfileId = null;
-      setStatus(status, "", "");
+      setEditorStatus("", "");
       renderProfileCards();
       updateEditorModeUi();
       if (kind || message) {
@@ -3021,7 +3051,7 @@
       setFetchState(false);
       setHealthCheckState(false);
       setStatus(listStatus, "", "");
-      setStatus(status, "", "");
+      setEditorStatus("", "");
       updateEditorModeUi();
       hydrateCachedModelsForConfig(profile || createEmptyConfig(), String((profile || createEmptyConfig()).defaultModel || "").trim()).catch(function () {});
     }
@@ -3058,7 +3088,7 @@
       }]);
       renderModelOptions(modelId);
       closeManualModelDialog();
-      setStatus(status, "success", alreadyExists ? strings.manualModelSelected : strings.manualModelAdded);
+      setEditorStatus("success", alreadyExists ? strings.manualModelSelected : strings.manualModelAdded, alreadyExists ? strings.manualModelSelected : strings.manualModelAdded);
     }
     function removeManualModel(modelId) {
       const nextSelectedValue = modelSelect.value === modelId ? "" : modelSelect.value;
@@ -3066,7 +3096,7 @@
         return !(item.value === modelId && item.manual);
       });
       renderModelOptions(nextSelectedValue);
-      setStatus(status, "success", strings.manualModelRemoved);
+      setEditorStatus("success", strings.manualModelRemoved, strings.manualModelRemoved);
     }
     function setFetchState(isFetching) {
       state.isFetchingModels = isFetching;
@@ -3082,10 +3112,20 @@
       modelMeta.textContent = message || strings.fetchedModelsHint;
       modelMeta.dataset.tone = tone || "";
     }
+    function restoreModelMeta() {
+      updateModelMeta(state.availableModels.length ? strings.fetchedModelsReady : strings.fetchedModelsHint, state.availableModels.length ? "ready" : "");
+    }
+    function setEditorStatus(kind, message, fallback) {
+      if (!kind) {
+        restoreModelMeta();
+        return;
+      }
+      updateModelMeta(compactStatusMessage(message, fallback || ""), kind === "success" ? "ready" : kind === "error" ? "error" : kind === "loading" ? "loading" : "");
+    }
     function renderModelOptions(selectedValue) {
       syncModelOptions(modelSelect, state.availableModels, selectedValue);
       modelDropdown.refresh();
-      updateModelMeta(state.availableModels.length ? strings.fetchedModelsReady : strings.fetchedModelsHint, state.availableModels.length ? "ready" : "");
+      restoreModelMeta();
     }
     function clearModels() {
       const currentModel = modelSelect.value;
@@ -3153,7 +3193,7 @@
         await hydrateCachedModelsForConfig(createEmptyConfig(), "");
         updateEditorModeUi();
       }
-      setStatus(status, "", "");
+      setEditorStatus("", "");
     }
     async function handleActivateProfile(profileId) {
       try {
@@ -3210,16 +3250,16 @@
       const next = readForm();
       try {
         setFetchState(true);
-        setStatus(status, "", "");
+        setEditorStatus("", "");
         updateModelMeta(strings.fetchedModelsLoading, "loading");
         const fetchedModels = mergeModelOptions(await fetchProviderModels(next), state.availableModels);
         state.availableModels = await persistFetchedModelsForEditor(next, fetchedModels);
         renderModelOptions(next.defaultModel || "");
-        setStatus(status, "", "");
+        setEditorStatus("", "");
       } catch (error) {
         renderModelOptions(next.defaultModel || modelSelect.value || "");
-        updateModelMeta(strings.fetchedModelsError, "error");
-        setStatus(status, "error", error && typeof error.message === "string" ? error.message : strings.fetchFailure);
+        restoreModelMeta();
+        setEditorStatus("error", error && typeof error.message === "string" ? error.message : "", strings.fetchFailure);
       } finally {
         setFetchState(false);
       }
@@ -3228,7 +3268,7 @@
       const next = readForm();
       try {
         setHealthCheckState(true);
-        setStatus(status, "", "");
+        setEditorStatus("", "");
         updateModelMeta(strings.healthChecking, "loading");
         debugLog("customProvider.health.start", {
           model: next.defaultModel,
@@ -3243,7 +3283,8 @@
           requestUrl: result?.requestUrl || "",
           replyPreview: preview
         });
-        updateModelMeta(strings.healthCheckSuccess.replace("{reply}", preview), "ready");
+        restoreModelMeta();
+        setEditorStatus("success", strings.healthCheckSuccess.replace("{reply}", preview), strings.healthCheckSuccess);
       } catch (error) {
         debugLog("customProvider.health.failure", {
           model: next.defaultModel,
@@ -3251,7 +3292,8 @@
           baseUrl: next.baseUrl,
           message: error && typeof error.message === "string" ? error.message : String(error || "")
         }, "error");
-        updateModelMeta(error && typeof error.message === "string" ? error.message : strings.healthCheckFailure, "error");
+        restoreModelMeta();
+        setEditorStatus("error", error && typeof error.message === "string" ? error.message : "", strings.healthCheckFailure);
       } finally {
         setHealthCheckState(false);
       }
@@ -3358,19 +3400,19 @@
     };
     window.addEventListener("keydown", handleWindowKeydown);
     modelSelect.addEventListener("change", function () {
-      setStatus(status, "", "");
+      setEditorStatus("", "");
     });
     reasoningSelect.addEventListener("change", function () {
-      setStatus(status, "", "");
+      setEditorStatus("", "");
     });
     contextWindowInput.addEventListener("input", function () {
       contextWindowInput.style.width = getContextWindowInputWidth(contextWindowInput.value, contextWindowInput.placeholder);
-      setStatus(status, "", "");
+      setEditorStatus("", "");
     });
     contextWindowInput.addEventListener("change", function () {
       contextWindowInput.value = formatContextWindowForInput(readContextWindowValue());
       contextWindowInput.style.width = getContextWindowInputWidth(contextWindowInput.value, contextWindowInput.placeholder);
-      setStatus(status, "", "");
+      setEditorStatus("", "");
     });
     contextWindowInput.addEventListener("keydown", function (event) {
       if (event.key === "ArrowUp") {
@@ -3413,17 +3455,17 @@
       event.preventDefault();
       const next = readForm();
       if (!next.baseUrl) {
-        setStatus(status, "error", strings.baseUrlRequired);
+        setEditorStatus("error", strings.baseUrlRequired, strings.baseUrlRequired);
         baseUrlInput.focus();
         return;
       }
       if (!next.apiKey) {
-        setStatus(status, "error", strings.apiKeyRequired);
+        setEditorStatus("error", strings.apiKeyRequired, strings.apiKeyRequired);
         apiKeyInput.focus();
         return;
       }
       if (!next.defaultModel) {
-        setStatus(status, "error", strings.defaultModelRequired);
+        setEditorStatus("error", strings.defaultModelRequired, strings.defaultModelRequired);
         modelSelect.focus();
         return;
       }
@@ -3433,7 +3475,7 @@
         applyStoredState(stored);
         openList("success", strings.saveSuccessEnabled);
       } catch (error) {
-        setStatus(status, "error", error && typeof error.message === "string" ? error.message : strings.saveFailure);
+        setEditorStatus("error", error && typeof error.message === "string" ? error.message : "", strings.saveFailure);
       } finally {
         saveButton.disabled = false;
       }
