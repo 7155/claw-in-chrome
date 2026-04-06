@@ -386,6 +386,54 @@ o();
 c().catch(e => {});
 R();
 const H = new Map();
+const __CP_SIDE_PANEL_LOCK_KEY = "cp_side_panel_locked";
+let __cpSidePanelLockedCache = false;
+async function __cpLoadSidePanelLockState() {
+  try {
+    __cpSidePanelLockedCache = (await chrome.storage.local.get(__CP_SIDE_PANEL_LOCK_KEY))?.[__CP_SIDE_PANEL_LOCK_KEY] === true;
+  } catch {
+    __cpSidePanelLockedCache = false;
+  }
+  return __cpSidePanelLockedCache;
+}
+function __cpIsSidePanelLocked() {
+  return __cpSidePanelLockedCache === true;
+}
+async function __cpApplySidePanelLock(e, t) {
+  if (!chrome.sidePanel) {
+    return;
+  }
+  if (e) {
+    await chrome.sidePanel.setOptions({
+      path: "sidepanel.html",
+      enabled: true
+    });
+    if (t) {
+      await chrome.sidePanel.setOptions({
+        tabId: t,
+        path: "sidepanel.html",
+        enabled: true
+      });
+    }
+    return;
+  }
+  await chrome.sidePanel.setOptions({
+    path: "sidepanel.html",
+    enabled: false
+  });
+  if (t) {
+    await chrome.sidePanel.setOptions({
+      tabId: t,
+      enabled: false
+    });
+  }
+}
+async function __cpSyncSidePanelLockSetting(e, t) {
+  const s = typeof e == "boolean" ? e : await __cpLoadSidePanelLockState();
+  __cpSidePanelLockedCache = s === true;
+  await __cpApplySidePanelLock(s, t);
+  return s;
+}
 chrome.runtime.onInstalled.addListener(async e => {
   chrome.storage.local.remove(["updateAvailable"]);
   chrome.runtime.setUninstallURL("https://docs.google.com/forms/d/e/1FAIpQLSdLa1wTVkB2ml2abPI1FP9KiboOnp2N0c3aDmp5rWmaOybWwQ/viewform");
@@ -394,6 +442,7 @@ chrome.runtime.onInstalled.addListener(async e => {
   await B();
   R();
   await F();
+  await __cpSyncSidePanelLockSetting();
 });
 chrome.runtime.onStartup.addListener(async () => {
   f();
@@ -402,6 +451,12 @@ chrome.runtime.onStartup.addListener(async () => {
   o();
   R();
   await F();
+  await __cpSyncSidePanelLockSetting();
+});
+chrome.storage.onChanged.addListener((e, t) => {
+  if (t === "local" && __CP_SIDE_PANEL_LOCK_KEY in e) {
+    __cpSidePanelLockedCache = e[__CP_SIDE_PANEL_LOCK_KEY]?.newValue === true;
+  }
 });
 chrome.permissions.onAdded.addListener(e => {
   if (e.permissions?.includes("nativeMessaging")) {
@@ -458,6 +513,9 @@ chrome.commands.onCommand.addListener(e => {
     });
   }
 });
+chrome.tabs.onActivated.addListener(e => {
+  __cpSyncSidePanelLockSetting(undefined, e.tabId).catch(() => {});
+});
 let q = false;
 async function W(e) {
   if (!chrome.sidePanel) {
@@ -475,20 +533,32 @@ async function W(e) {
     }
     return;
   }
-  chrome.sidePanel.setOptions({
-    tabId: e,
-    path: `sidepanel.html?tabId=${encodeURIComponent(e)}`,
-    enabled: true
-  });
-  chrome.sidePanel.open({
+  if (__cpIsSidePanelLocked()) {
+    chrome.sidePanel.setOptions({
+      path: "sidepanel.html",
+      enabled: true
+    });
+    chrome.sidePanel.setOptions({
+      tabId: e,
+      path: "sidepanel.html",
+      enabled: true
+    });
+  } else {
+    chrome.sidePanel.setOptions({
+      tabId: e,
+      path: `sidepanel.html?tabId=${encodeURIComponent(e)}`,
+      enabled: true
+    });
+  }
+  await chrome.sidePanel.open({
     tabId: e
   });
   await t.initialize(true);
-  const s = await t.findGroupByTab(e);
-  if (s) {
-    if (s.isUnmanaged) {
+  const i = await t.findGroupByTab(e);
+  if (i) {
+    if (i.isUnmanaged) {
       try {
-        await t.adoptOrphanedGroup(e, s.chromeGroupId);
+        await t.adoptOrphanedGroup(e, i.chromeGroupId);
       } catch (a) {}
       return;
     }
@@ -502,7 +572,11 @@ async function W(e) {
 async function K(e) {
   const t = e.id;
   if (t) {
-    await W(t);
+    try {
+      await W(t);
+    } catch (s) {
+      console.error("Failed to open side panel", s);
+    }
   }
 }
 async function z(e, s) {
@@ -641,6 +715,27 @@ chrome.runtime.onMessage.addListener((e, s, a) => {
         return;
       }
       if (e.type !== "PLAY_NOTIFICATION_SOUND") {
+        if (e.type === "SET_SIDE_PANEL_LOCK") {
+          const t = e.locked === true;
+          const n = e.tabId || s.tab?.id;
+          __cpSidePanelLockedCache = t;
+          await chrome.storage.local.set({
+            [__CP_SIDE_PANEL_LOCK_KEY]: t
+          });
+          await __cpApplySidePanelLock(t, n);
+          a({
+            success: true,
+            locked: t
+          });
+          return;
+        }
+        if (e.type === "GET_SIDE_PANEL_LOCK_STATE") {
+          a({
+            success: true,
+            locked: __cpIsSidePanelLocked()
+          });
+          return;
+        }
         if (e.type === "open_side_panel") {
           const t = e.tabId || s.tab?.id;
           if (!t) {
@@ -649,7 +744,14 @@ chrome.runtime.onMessage.addListener((e, s, a) => {
             });
             return;
           }
-          await W(t);
+          try {
+            await W(t);
+          } catch {
+            a({
+              success: false
+            });
+            return;
+          }
           if (e.prompt) {
             const t = async (s = 0) => {
               try {

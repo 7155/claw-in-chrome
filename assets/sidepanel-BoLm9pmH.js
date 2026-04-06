@@ -84458,7 +84458,9 @@ const jX = ({
   isPurlMode: g,
   onTogglePurlMode: b,
   analytics: w,
-  onOpenConversationSwitcher: k
+  onOpenConversationSwitcher: k,
+  isSidePanelLocked: L,
+  onToggleSidePanelLock: O
 }) => {
   const T = t();
   const [C, _] = a.useState(false);
@@ -84516,6 +84518,20 @@ const jX = ({
             defaultMessage: "Chats",
             id: "0vA3X6tGwy"
           })
+        })
+      }), O && l.jsx(J, {
+        tooltipContent: L ? T.formatMessage({
+          defaultMessage: "Unlock sidebar",
+          id: "CVuzkU28wH"
+        }) : T.formatMessage({
+          defaultMessage: "Keep sidebar open across tabs",
+          id: "8kq0Yz1slp"
+        }),
+        children: l.jsx("button", {
+          onClick: O,
+          className: "px-2 py-1.5 rounded-md transition-colors text-[11px] font-medium " + (L ? "bg-bg-300 text-text-100" : "text-text-300 hover:bg-bg-300 hover:text-text-100"),
+          "aria-label": L ? "Unlock sidebar" : "Lock sidebar",
+          children: L ? "Locked" : "Lock"
         })
       }), b && l.jsx(J, {
         tooltipContent: C ? l.jsxs("div", {
@@ -85990,24 +86006,24 @@ class WX {
           return `${s}\n\nHow would you like to proceed?`;
         }
       }(this.extractTextFromResponse(t), n);
-      const i = {
+      const o = {
         role: "user",
         content: s,
         isCompactSummary: true
       };
-      const a = this.preserveRecentContext(e);
-      const l = [{
+      const l = this.preserveRecentContext(e);
+      const c = [{
         role: "assistant",
         content: "This conversation has been summarized so we can keep going.",
         isCompactionMessage: true
-      }, i, ...a];
-      const c = 1600;
-      const u = Math.round(s.length / 4 + a.reduce((e, t) => {
+      }, o, ...l];
+      const u = 1600;
+      const d = Math.round(s.length / 4 + l.reduce((e, t) => {
         let n = 0;
         if (typeof t.content == "string") {
           n = t.content.length / 4;
         } else if (Array.isArray(t.content)) {
-          n = t.content.filter(e => "type" in e && e.type === "image").length * c;
+          n = t.content.filter(e => "type" in e && e.type === "image").length * u;
           n += JSON.stringify(t.content.filter(e => "type" in e && e.type !== "image")).length / 4;
         } else {
           n = JSON.stringify(t.content).length / 4;
@@ -86015,11 +86031,11 @@ class WX {
         return e + n;
       }, 0));
       return {
-        summaryMessage: i,
-        messagesAfterCompacting: l,
+        summaryMessage: o,
+        messagesAfterCompacting: c,
         preCompactTokenCount: i,
-        postCompactTokenCount: u,
-        tokensSaved: Math.max(0, i - u)
+        postCompactTokenCount: d,
+        tokensSaved: Math.max(0, i - d)
       };
     } catch (a) {
       throw new Error(`Failed to compact conversation: ${a}`);
@@ -91227,6 +91243,7 @@ class WQ {
 }
 const __CP_PERSISTED_CHAT_SESSIONS_KEY = "cp_persisted_chat_sessions";
 const __CP_PERSISTED_CHAT_CONTEXTS_KEY = "cp_persisted_chat_contexts";
+const __CP_SIDE_PANEL_LOCK_KEY = "cp_side_panel_locked";
 const __CP_PERSISTED_CHAT_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
 const __CP_PERSISTED_CHAT_MAX_SESSIONS = 50;
 function __cpClonePersistedChatMessages(e) {
@@ -93315,6 +93332,7 @@ function o1() {
   const te = g("chrome_ext_flash_enabled", false);
   const [ne, se] = a.useState(false);
   const [re, ie] = a.useState(false);
+  const [__cpSidePanelLocked, __cpSetSidePanelLocked] = a.useState(false);
   // 首屏模型初始化的去重与并发锁，避免配置未变时重复 bootstrap。
   const __cpModelBootstrapSignatureRef = a.useRef("");
   const __cpModelBootstrapActiveRef = a.useRef(false);
@@ -93378,7 +93396,8 @@ function o1() {
     const {
       permissionManager: t,
       permissionMode: n,
-      setPermissionMode: s
+      setPermissionMode: s,
+      lockedMode: lockMode
     } = e;
     const [r, i] = a.useState(undefined);
     const [o, l] = a.useState(undefined);
@@ -93396,6 +93415,58 @@ function o1() {
     const _ = p !== "category0" && p !== null;
     const M = p === "category1" || p === "category2" || p === "category_org_blocked" || x;
     const S = p === "category3";
+    const refreshTabState = a.useCallback(async e => {
+      if (!e) {
+        i(undefined);
+        l(undefined);
+        u(undefined);
+        h(undefined);
+        m(null);
+        b(false);
+        T(__cpDefaultBlockedTabInfo);
+        return;
+      }
+      i(e);
+      try {
+        const a = await chrome.tabs.get(e);
+        if (a.url) {
+          await gt.initialize();
+          const r = await gt.isInGroup(e);
+          const i = gt.isMainTab(e);
+          let o;
+          if (r && i) {
+            o = await gt.getGroupBlocklistStatus(e);
+            const {
+              isMainTabBlocked: e,
+              blockedTabs: t
+            } = await gt.getBlockedTabsInfo(e);
+            T({
+              isMainTabBlocked: e,
+              blockedTabs: t
+            });
+          } else {
+            o = await rn.getCategory(a.url);
+            T(__cpDefaultBlockedTabInfo);
+          }
+          m(o || null);
+          b(a.url.startsWith(C));
+          u(a.url);
+          h(a.title);
+          try {
+            const e = new URL(a.url);
+            l(e.hostname);
+            if ((await t.hasSiteWidePermissions(e.hostname)) && n === "ask") {
+              s("allow_for_site");
+            }
+          } catch {
+            l(undefined);
+            if (n === "allow_for_site") {
+              s("ask");
+            }
+          }
+        }
+      } catch {}
+    }, [C, n, t, s, T]);
     t.setForcePrompt(S);
     a.useEffect(() => {
       (async function () {
@@ -93409,51 +93480,18 @@ function o1() {
           if (e) {
             o = e;
           }
+        } else if (lockMode) {
+          const [e] = await chrome.tabs.query({
+            active: true,
+            currentWindow: true
+          });
+          if (e?.id) {
+            o = e.id;
+          }
         }
-        i(o);
-        if (o) {
-          try {
-            const e = await chrome.tabs.get(o);
-            if (e.url) {
-              await gt.initialize();
-              const r = await gt.isInGroup(o);
-              const i = gt.isMainTab(o);
-              let a;
-              if (r && i) {
-                a = await gt.getGroupBlocklistStatus(o);
-                const {
-                  isMainTabBlocked: e,
-                  blockedTabs: t
-                } = await gt.getBlockedTabsInfo(o);
-                T({
-                  isMainTabBlocked: e,
-                  blockedTabs: t
-                });
-              } else {
-                a = await rn.getCategory(e.url);
-                T(__cpDefaultBlockedTabInfo);
-              }
-              m(a || null);
-              b(e.url.startsWith(C));
-              u(e.url);
-              h(e.title);
-              try {
-                const r = new URL(e.url);
-                l(r.hostname);
-                if ((await t.hasSiteWidePermissions(r.hostname)) && n === "ask") {
-                  s("allow_for_site");
-                }
-              } catch (Ct) {
-                l(undefined);
-                if (n === "allow_for_site") {
-                  s("ask");
-                }
-              }
-            }
-          } catch (Ct) {}
-        }
+        await refreshTabState(o);
       })();
-    }, [C, n, t, s]);
+    }, [lockMode, refreshTabState]);
     a.useEffect(() => {
       if (!r) {
         return;
@@ -93474,6 +93512,26 @@ function o1() {
         chrome.tabs.onUpdated.removeListener(e);
       };
     }, [r]);
+    a.useEffect(() => {
+      if (!lockMode) {
+        return;
+      }
+      const e = () => {
+        chrome.tabs.query({
+          active: true,
+          currentWindow: true
+        }).then(e => {
+          refreshTabState(e?.[0]?.id);
+        }).catch(() => {});
+      };
+      e();
+      chrome.tabs.onActivated.addListener(e);
+      chrome.windows.onFocusChanged.addListener(e);
+      return () => {
+        chrome.tabs.onActivated.removeListener(e);
+        chrome.windows.onFocusChanged.removeListener(e);
+      };
+    }, [lockMode, refreshTabState]);
     a.useEffect(() => {
       let e = true;
       y(v.BROWSER_CONTROL_PERMISSION_ACCEPTED).then(t => {
@@ -93525,7 +93583,8 @@ function o1() {
   }({
     permissionManager: ae,
     permissionMode: i.permissionMode,
-    setPermissionMode: i.setPermissionMode
+    setPermissionMode: i.setPermissionMode,
+    lockedMode: __cpSidePanelLocked
   });
   const {
     sendNotification: Me
@@ -94096,16 +94155,58 @@ function o1() {
     if (__cpSidepanelMode === "window" && __cpWindowSessionId) {
       return `window:${__cpWindowSessionId}`;
     }
+    if (__cpSidePanelLocked && __cpSidepanelMode === "panel") {
+      return "panel:locked";
+    }
     const e = je || ce;
     if (!e) {
       return null;
     }
     return `${__cpSidepanelMode}:${e}`;
-  }, [__cpIsMcpPermissionOnly, __cpSidepanelMode, __cpWindowSessionId, je, ce]);
+  }, [__cpIsMcpPermissionOnly, __cpSidepanelMode, __cpWindowSessionId, __cpSidePanelLocked, je, ce]);
   const __cpPersistedChatHydratedRef = a.useRef(false);
   const __cpPersistedChatKeyRef = a.useRef(null);
   const [__cpSavedChats, __cpSetSavedChats] = a.useState([]);
   const [__cpConversationSwitcherOpen, __cpSetConversationSwitcherOpen] = a.useState(false);
+  a.useEffect(() => {
+    let e = true;
+    chrome.storage.local.get(__CP_SIDE_PANEL_LOCK_KEY).then(t => {
+      if (e) {
+        __cpSetSidePanelLocked(t?.[__CP_SIDE_PANEL_LOCK_KEY] === true);
+      }
+    }).catch(() => {});
+    if (!chrome.storage?.onChanged) {
+      return () => {
+        e = false;
+      };
+    }
+    const t = (t, n) => {
+      if (e && n === "local" && __CP_SIDE_PANEL_LOCK_KEY in t) {
+        __cpSetSidePanelLocked(t[__CP_SIDE_PANEL_LOCK_KEY]?.newValue === true);
+      }
+    };
+    chrome.storage.onChanged.addListener(t);
+    return () => {
+      e = false;
+      chrome.storage.onChanged.removeListener(t);
+    };
+  }, []);
+  const __cpToggleSidePanelLock = a.useCallback(async () => {
+    const e = !__cpSidePanelLocked;
+    __cpSetSidePanelLocked(e);
+    try {
+      const t = await chrome.runtime.sendMessage({
+        type: "SET_SIDE_PANEL_LOCK",
+        locked: e,
+        tabId: ce ?? null
+      });
+      if (!t?.success) {
+        __cpSetSidePanelLocked(!e);
+      }
+    } catch {
+      __cpSetSidePanelLocked(!e);
+    }
+  }, [__cpSidePanelLocked, ce]);
   const __cpRefreshSavedChats = a.useCallback(async () => {
     try {
       __cpSetSavedChats(await __cpListPersistedChats());
@@ -95586,6 +95687,8 @@ function o1() {
           hasMessages: dt.length > 0,
           isPurlMode: !hasCustomProviderAuth_ && te && !!ne,
           onOpenConversationSwitcher: () => __cpSetConversationSwitcherOpen(true),
+          isSidePanelLocked: __cpSidePanelLocked,
+          onToggleSidePanelLock: __cpToggleSidePanelLock,
           analytics: He,
           onTogglePurlMode: te && !hasCustomProviderAuth_ ? () => {
             if (ne) {
