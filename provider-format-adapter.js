@@ -96,6 +96,35 @@
     }
     return text.slice(0, limit) + "...[truncated]";
   }
+  function resolvePromptCacheUserId(body) {
+    return String(body?.metadata?.user_id || "").trim();
+  }
+  function buildPromptCacheKey(body, format) {
+    const userId = resolvePromptCacheUserId(body);
+    if (!userId) {
+      return "";
+    }
+    const model = String(body?.model || "").trim() || "unknown";
+    return truncateText("claw:" + String(format || "openai") + ":" + model + ":" + userId, 240);
+  }
+  function resolvePromptCacheRetention(body) {
+    const retention = String(body?.prompt_cache_retention || "").trim().toLowerCase();
+    if (retention === "24h" || retention === "in_memory") {
+      return retention;
+    }
+    return "in_memory";
+  }
+  function applyPromptCacheHints(target, body, format) {
+    if (!target || !body || typeof target !== "object" || typeof body !== "object") {
+      return;
+    }
+    const promptCacheKey = buildPromptCacheKey(body, format);
+    if (!promptCacheKey) {
+      return;
+    }
+    target.prompt_cache_key = promptCacheKey;
+    target.prompt_cache_retention = resolvePromptCacheRetention(body);
+  }
   function findSseSeparator(buffer) {
     const lfIndex = buffer.indexOf("\n\n");
     const crlfIndex = buffer.indexOf("\r\n\r\n");
@@ -551,6 +580,7 @@
     if (toolChoice !== undefined) {
       result.tool_choice = toolChoice;
     }
+    applyPromptCacheHints(result, body, OPENAI_CHAT_FORMAT);
     return result;
   }
   function openAIChatToAnthropic(body) {
@@ -764,6 +794,7 @@
     if (toolChoice !== undefined) {
       result.tool_choice = toolChoice;
     }
+    applyPromptCacheHints(result, body, OPENAI_RESPONSES_FORMAT);
     return result;
   }
   function openAIResponsesToAnthropic(body) {

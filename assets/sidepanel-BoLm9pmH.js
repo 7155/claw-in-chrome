@@ -84345,6 +84345,103 @@ const SX = ({
     })]
   });
 };
+const __cpFormatPersistedChatTime = e => {
+  try {
+    return new Date(e).toLocaleString([], {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit"
+    });
+  } catch {
+    return "";
+  }
+};
+const __cpConversationSwitcherModal = ({
+  isOpen: n,
+  onClose: s,
+  chats: r,
+  activeSessionId: i,
+  onSelectChat: o,
+  onCreateChat: c
+}) => {
+  const u = t();
+  const d = Array.isArray(r) ? r.filter(e => (e?.messageCount || 0) > 0) : [];
+  return l.jsxs(_e, {
+    isOpen: n,
+    onClose: s,
+    title: u.formatMessage({
+      defaultMessage: "Conversations",
+      id: "FwJpM8h2I7"
+    }),
+    modalSize: "sm",
+    className: "bg-bg-100",
+    hasCloseButton: true,
+    autoCloseOnFocusOut: true,
+    overlayClassName: "[background-color:hsl(var(--always-black)/0.5)!important]",
+    children: [l.jsxs("div", {
+      className: "mt-4 flex items-center justify-between gap-3",
+      children: [l.jsx("p", {
+        className: "text-sm text-text-300",
+        children: l.jsx(e, {
+          defaultMessage: "Switch to a recent chat or start a new one.",
+          id: "4sZ6uQtwgR"
+        })
+      }), l.jsx(Q, {
+        variant: "secondary",
+        onClick: () => {
+          c();
+          s();
+        },
+        children: l.jsx(e, {
+          defaultMessage: "New chat",
+          id: "hYjR7tqN1P"
+        })
+      })]
+    }), l.jsx("div", {
+      className: "mt-4 max-h-[360px] overflow-y-auto space-y-2",
+      children: d.length > 0 ? d.map(t => {
+        const n = t.sessionId === i;
+        return l.jsxs("button", {
+          type: "button",
+          onClick: () => {
+            o(t.sessionId);
+            s();
+          },
+          className: "w-full rounded-xl border px-3 py-3 text-left transition-colors " + (n ? "border-accent-200 bg-bg-200" : "border-border-300 hover:bg-bg-200"),
+          children: [l.jsxs("div", {
+            className: "flex items-start justify-between gap-3",
+            children: [l.jsx("div", {
+              className: "min-w-0 flex-1 text-sm font-medium text-text-100 truncate",
+              children: t.title || u.formatMessage({
+                defaultMessage: "Untitled chat",
+                id: "gqv7Z1Md7L"
+              })
+            }), l.jsx("div", {
+              className: "shrink-0 text-[11px] text-text-300",
+              children: n ? l.jsx(e, {
+                defaultMessage: "Current",
+                id: "GvUoQf9tqj"
+              }) : __cpFormatPersistedChatTime(t.updatedAt)
+            })]
+          }), l.jsx("div", {
+            className: "mt-1 text-xs text-text-300 line-clamp-2",
+            children: t.preview || u.formatMessage({
+              defaultMessage: "No preview available",
+              id: "8Y5oLQpNf7"
+            })
+          })]
+        }, t.sessionId);
+      }) : l.jsx("div", {
+        className: "rounded-xl border border-border-300 px-3 py-6 text-center text-sm text-text-300",
+        children: l.jsx(e, {
+          defaultMessage: "No saved conversations yet.",
+          id: "3Y7vQnLx2d"
+        })
+      })
+    })]
+  });
+};
 const jX = ({
   showModelSelector: n,
   selectedModel: s,
@@ -84360,9 +84457,10 @@ const jX = ({
   hasMessages: f,
   isPurlMode: g,
   onTogglePurlMode: b,
-  analytics: w
+  analytics: w,
+  onOpenConversationSwitcher: k
 }) => {
-  const k = t();
+  const T = t();
   const [C, _] = a.useState(false);
   const M = !!b;
   a.useEffect(() => {
@@ -84401,7 +84499,25 @@ const jX = ({
       })
     }), l.jsxs("div", {
       className: "flex items-center gap-2.5",
-      children: [b && l.jsx(J, {
+      children: [k && l.jsx(J, {
+        tooltipContent: T.formatMessage({
+          defaultMessage: "Switch conversation",
+          id: "EEi4YQvJUi"
+        }),
+        children: l.jsx("button", {
+          onClick: k,
+          disabled: p,
+          className: "px-2 py-1.5 rounded-md transition-colors text-[11px] font-medium text-text-300 hover:bg-bg-300 hover:text-text-100 " + (p ? "opacity-40 cursor-not-allowed" : ""),
+          "aria-label": T.formatMessage({
+            defaultMessage: "Switch conversation",
+            id: "EEi4YQvJUi"
+          }),
+          children: l.jsx(e, {
+            defaultMessage: "Chats",
+            id: "0vA3X6tGwy"
+          })
+        })
+      }), b && l.jsx(J, {
         tooltipContent: C ? l.jsxs("div", {
           className: "relative",
           children: [l.jsx("div", {
@@ -84452,14 +84568,14 @@ const jX = ({
           })
         })
       }), l.jsx(J, {
-        tooltipContent: k.formatMessage({
+        tooltipContent: T.formatMessage({
           defaultMessage: "Clear chat",
           id: "I4AiMx3dsz"
         }),
         children: l.jsx("button", {
           onClick: u,
           className: "p-1.5 rounded-md transition-colors text-text-300 hover:bg-bg-300 hover:text-text-100",
-          "aria-label": k.formatMessage({
+          "aria-label": T.formatMessage({
             defaultMessage: "Clear chat",
             id: "I4AiMx3dsz"
           }),
@@ -87969,11 +88085,14 @@ function CQ({
       };
       const w = p || "anthropic_message_create";
       const k = await M(w, async e => {
-        if (r) {
-          const t = `user_${o ?? "unknown"}_account_${r}_session_${i ?? "unknown"}`;
+        const t = r ? `user_${o ?? "unknown"}_account_${r}_session_${i ?? "unknown"}` : i ? `user_${o ?? "unknown"}_session_${i}` : "";
+        if (t) {
           b.metadata = {
+            ...(b.metadata && typeof b.metadata == "object" ? b.metadata : {}),
             user_id: t
           };
+        }
+        if (r) {
           e.setAttribute("account_uuid", r);
         }
         e.setAttribute("session_id", i || "");
@@ -88588,11 +88707,14 @@ function CQ({
                 }
               } : {})
             };
-            if (ue?.account.uuid) {
-              const e = `user_${r ?? "unknown"}_account_${ue.account.uuid}_session_${s ?? "unknown"}`;
+            const e = ue?.account.uuid ? `user_${r ?? "unknown"}_account_${ue.account.uuid}_session_${s ?? "unknown"}` : s ? `user_${r ?? "unknown"}_session_${s}` : "";
+            if (e) {
               C.metadata = {
+                ...(C.metadata && typeof C.metadata == "object" ? C.metadata : {}),
                 user_id: e
               };
+            }
+            if (ue?.account.uuid) {
               y.setAttribute("account_uuid", ue.account.uuid);
               l?.setAttribute("account_uuid", ue.account.uuid);
             }
@@ -89419,8 +89541,14 @@ function FQ(e) {
           speed: "fast"
         })
       };
+      if (r) {
+        s.metadata = {
+          ...(s.metadata && typeof s.metadata == "object" ? s.metadata : {}),
+          user_id: `user_session_${r}`
+        };
+      }
       return await D.current.beta.messages.create(s);
-    }, [ee, te]);
+    }, [ee, te, r]);
     const re = a.useCallback(async (e, t, n, r) => {
       if (!D.current || !z.current) {
         w("Chat session not initialized. Check your connection.");
@@ -91096,6 +91224,240 @@ class WQ {
   static async clearAllLogs() {
     await chrome.storage.local.remove([v.SCHEDULED_TASK_LOGS, v.SCHEDULED_TASK_STATS]);
   }
+}
+const __CP_PERSISTED_CHAT_SESSIONS_KEY = "cp_persisted_chat_sessions";
+const __CP_PERSISTED_CHAT_CONTEXTS_KEY = "cp_persisted_chat_contexts";
+const __CP_PERSISTED_CHAT_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
+const __CP_PERSISTED_CHAT_MAX_SESSIONS = 50;
+function __cpClonePersistedChatMessages(e) {
+  if (!Array.isArray(e)) {
+    return [];
+  }
+  try {
+    return JSON.parse(JSON.stringify(e));
+  } catch {
+    return [];
+  }
+}
+function __cpSanitizePersistedChatMessages(e) {
+  const t = __cpClonePersistedChatMessages(e);
+  if (!Array.isArray(t) || t.length === 0) {
+    return [];
+  }
+  const n = new Set();
+  const s = new Set();
+  t.forEach(e => {
+    if (e?.role === "assistant" && Array.isArray(e.content)) {
+      e.content.forEach(e => {
+        if (e?.type === "tool_use" && e.id) {
+          n.add(String(e.id));
+        }
+      });
+    }
+    if (e?.role === "user" && Array.isArray(e.content)) {
+      e.content.forEach(e => {
+        if (e?.type === "tool_result" && e.tool_use_id) {
+          s.add(String(e.tool_use_id));
+        }
+      });
+    }
+  });
+  const r = new Set(Array.from(n).filter(e => s.has(e)));
+  return t.map(e => {
+    if (!Array.isArray(e?.content)) {
+      return e;
+    }
+    const t = e.content.filter(t => {
+      if (t?.type === "tool_use") {
+        return !!t.id && r.has(String(t.id));
+      }
+      if (t?.type === "tool_result") {
+        return !!t.tool_use_id && r.has(String(t.tool_use_id));
+      }
+      return true;
+    });
+    return {
+      ...e,
+      content: t
+    };
+  }).filter(e => {
+    if (typeof e?.content === "string") {
+      return true;
+    }
+    if (Array.isArray(e?.content)) {
+      return e.content.length > 0;
+    }
+    return true;
+  });
+}
+function __cpExtractPersistedChatText(e) {
+  if (typeof e == "string") {
+    return e.trim();
+  }
+  if (!Array.isArray(e)) {
+    return "";
+  }
+  return e.map(e => {
+    if (e?.type === "text" && typeof e.text == "string") {
+      return e.text;
+    }
+    if (e?.type === "tool_result") {
+      return __cpExtractPersistedChatText(e.content);
+    }
+    return "";
+  }).filter(Boolean).join(" ").trim();
+}
+function __cpBuildPersistedChatSummary(e) {
+  const t = Array.isArray(e) ? e : [];
+  const n = t.find(e => e?.role === "user" && !e?._synthetic && !e?._syntheticResult && __cpExtractPersistedChatText(e.content));
+  const s = [...t].reverse().find(e => (e?.role === "user" || e?.role === "assistant") && __cpExtractPersistedChatText(e.content));
+  const r = __cpExtractPersistedChatText(n?.content) || "New chat";
+  const i = __cpExtractPersistedChatText(s?.content) || r;
+  return {
+    title: r.length > 48 ? r.slice(0, 48) + "..." : r,
+    preview: i.length > 96 ? i.slice(0, 96) + "..." : i,
+    messageCount: t.filter(e => e?.role === "user" || e?.role === "assistant").length
+  };
+}
+function __cpNormalizePersistedChatSessions(e) {
+  if (!e || typeof e != "object" || Array.isArray(e)) {
+    return {};
+  }
+  const t = Date.now();
+  const n = {};
+  for (const [s, r] of Object.entries(e)) {
+    if (!r || typeof r != "object" || Array.isArray(r)) {
+      continue;
+    }
+    const i = String(r.sessionId || r.id || s || "").trim();
+    if (!i) {
+      continue;
+    }
+    const o = Number(r.updatedAt || 0);
+    if (!Number.isFinite(o) || t - o > __CP_PERSISTED_CHAT_MAX_AGE_MS) {
+      continue;
+    }
+    const a = __cpSanitizePersistedChatMessages(r.messages);
+    const l = __cpBuildPersistedChatSummary(a);
+    n[i] = {
+      ...r,
+      id: i,
+      sessionId: i,
+      createdAt: Number.isFinite(Number(r.createdAt)) ? Number(r.createdAt) : o,
+      updatedAt: o,
+      lastContextKey: String(r.lastContextKey || (s.includes(":") ? s : "") || "").trim(),
+      messages: a,
+      title: String(r.title || l.title || "New chat"),
+      preview: String(r.preview || l.preview || ""),
+      messageCount: Number.isFinite(Number(r.messageCount)) ? Number(r.messageCount) : l.messageCount
+    };
+  }
+  return Object.fromEntries(Object.entries(n).sort((e, t) => Number(t[1]?.updatedAt || 0) - Number(e[1]?.updatedAt || 0)).slice(0, __CP_PERSISTED_CHAT_MAX_SESSIONS));
+}
+function __cpNormalizePersistedChatContexts(e, t) {
+  if (!e || typeof e != "object" || Array.isArray(e)) {
+    return {};
+  }
+  const n = {};
+  for (const [s, r] of Object.entries(e)) {
+    const i = String(r || "").trim();
+    if (s && i && t[i]) {
+      n[s] = i;
+    }
+  }
+  return n;
+}
+async function __cpReadPersistedChatState() {
+  const e = await chrome.storage.local.get([__CP_PERSISTED_CHAT_SESSIONS_KEY, __CP_PERSISTED_CHAT_CONTEXTS_KEY]);
+  const t = __cpNormalizePersistedChatSessions(e[__CP_PERSISTED_CHAT_SESSIONS_KEY] || {});
+  const n = __cpNormalizePersistedChatContexts(e[__CP_PERSISTED_CHAT_CONTEXTS_KEY] || {}, t);
+  return {
+    sessions: t,
+    contexts: n
+  };
+}
+async function __cpWritePersistedChatState(e) {
+  const t = __cpNormalizePersistedChatSessions(e?.sessions || {});
+  const n = __cpNormalizePersistedChatContexts(e?.contexts || {}, t);
+  await chrome.storage.local.set({
+    [__CP_PERSISTED_CHAT_SESSIONS_KEY]: t,
+    [__CP_PERSISTED_CHAT_CONTEXTS_KEY]: n
+  });
+}
+async function __cpListPersistedChats() {
+  return Object.values((await __cpReadPersistedChatState()).sessions).sort((e, t) => Number(t.updatedAt || 0) - Number(e.updatedAt || 0));
+}
+async function __cpGetPersistedChatBySessionId(e) {
+  if (!e) {
+    return null;
+  }
+  const t = await __cpReadPersistedChatState();
+  return t.sessions[e] || null;
+}
+async function __cpLoadPersistedChat(e) {
+  if (!e) {
+    return null;
+  }
+  const t = await __cpReadPersistedChatState();
+  const n = t.contexts[e];
+  if (n && t.sessions[n]) {
+    return t.sessions[n];
+  }
+  const s = Object.values(t.sessions).find(t => t.lastContextKey === e);
+  return s || null;
+}
+async function __cpActivatePersistedChat(e, t) {
+  if (!e || !t) {
+    return;
+  }
+  const n = await __cpReadPersistedChatState();
+  if (!n.sessions[t]) {
+    return;
+  }
+  n.contexts[e] = t;
+  n.sessions[t] = {
+    ...n.sessions[t],
+    lastContextKey: e,
+    updatedAt: Date.now()
+  };
+  await __cpWritePersistedChatState(n);
+}
+async function __cpSavePersistedChat(e, t) {
+  if (!e) {
+    return;
+  }
+  const n = String(t?.sessionId || "").trim();
+  if (!n) {
+    return;
+  }
+  const s = await __cpReadPersistedChatState();
+  const r = s.sessions[n];
+  s.sessions[n] = {
+    ...r,
+    ...t,
+    id: n,
+    sessionId: n,
+    createdAt: Number.isFinite(Number(r?.createdAt)) ? Number(r.createdAt) : Date.now(),
+    updatedAt: Number(t?.updatedAt || Date.now()),
+    lastContextKey: e,
+    messages: __cpSanitizePersistedChatMessages(t?.messages)
+  };
+  s.contexts[e] = n;
+  await __cpWritePersistedChatState(s);
+}
+async function __cpDeletePersistedChat(e, t) {
+  const n = await __cpReadPersistedChatState();
+  const s = String(t || n.contexts[e] || "").trim();
+  if (!s) {
+    return;
+  }
+  delete n.sessions[s];
+  for (const [t, r] of Object.entries(n.contexts)) {
+    if (String(r || "").trim() === s) {
+      delete n.contexts[t];
+    }
+  }
+  await __cpWritePersistedChatState(n);
 }
 // 会话输入态：当前 sessionId、输入框内容和待保存/待编辑 prompt 都挂在这里。
 const qQ = ut(e => ({
@@ -93687,7 +94049,8 @@ function o1() {
     createAnthropicMessage: St,
     lastStopReason: jt,
     currentStatus: Et,
-    conversationUuid: Tt
+    conversationUuid: Tt,
+    setMessages: __cpSetMessages
   } = FQ({
     isPurlMode: !hasCustomProviderAuth_ && te && !!ne,
     apiKey: Z,
@@ -93723,6 +94086,94 @@ function o1() {
       });
     }
   });
+  const __cpSidepanelMode = a.useMemo(() => new URLSearchParams(window.location.search).get("mode") === "window" ? "window" : "panel", []);
+  const __cpWindowSessionId = a.useMemo(() => new URLSearchParams(window.location.search).get("sessionId") || "", []);
+  const __cpIsMcpPermissionOnly = a.useMemo(() => new URLSearchParams(window.location.search).get("mcpPermissionOnly") === "true", []);
+  const __cpPersistedChatKey = a.useMemo(() => {
+    if (__cpIsMcpPermissionOnly) {
+      return null;
+    }
+    if (__cpSidepanelMode === "window" && __cpWindowSessionId) {
+      return `window:${__cpWindowSessionId}`;
+    }
+    const e = je || ce;
+    if (!e) {
+      return null;
+    }
+    return `${__cpSidepanelMode}:${e}`;
+  }, [__cpIsMcpPermissionOnly, __cpSidepanelMode, __cpWindowSessionId, je, ce]);
+  const __cpPersistedChatHydratedRef = a.useRef(false);
+  const __cpPersistedChatKeyRef = a.useRef(null);
+  const [__cpSavedChats, __cpSetSavedChats] = a.useState([]);
+  const [__cpConversationSwitcherOpen, __cpSetConversationSwitcherOpen] = a.useState(false);
+  const __cpRefreshSavedChats = a.useCallback(async () => {
+    try {
+      __cpSetSavedChats(await __cpListPersistedChats());
+    } catch (e) {}
+  }, []);
+  const __cpSaveConversationSnapshot = a.useCallback(async (e, t) => {
+    if (!__cpPersistedChatKey || !__cpPersistedChatHydratedRef.current) {
+      return;
+    }
+    await __cpSavePersistedChat(__cpPersistedChatKey, {
+      sessionId: e || "",
+      messages: Array.isArray(t) ? t : [],
+      mode: __cpSidepanelMode,
+      tabId: ce ?? null,
+      mainTabId: je ?? null,
+      updatedAt: Date.now()
+    });
+    await __cpRefreshSavedChats();
+  }, [__cpPersistedChatKey, __cpSidepanelMode, ce, je, __cpRefreshSavedChats]);
+  const __cpResetConversationView = a.useCallback(async () => {
+    if (Ee.current) {
+      Ee.current(false);
+      Ee.current = null;
+      i.setPermissionPrompt(null);
+    }
+    await yt();
+    R(new Map());
+    r.resetOnSessionClear();
+    o.setInputText("");
+    o.setPendingPrompt(null);
+    o.setPromptToSave(null);
+    o.setPromptToEdit(null);
+    Qe();
+  }, [i, yt, R, r, o, Qe]);
+  const __cpCreateNewConversation = a.useCallback(async (e = false) => {
+    if (e && __cpPersistedChatKey && o.sessionId) {
+      await __cpDeletePersistedChat(__cpPersistedChatKey, o.sessionId);
+    } else if (!e && o.sessionId) {
+      await __cpSaveConversationSnapshot(o.sessionId, dt);
+    }
+    await __cpResetConversationView();
+    const t = o.generateNewSessionId();
+    __cpPersistedChatHydratedRef.current = true;
+    await __cpSavePersistedChat(__cpPersistedChatKey, {
+      sessionId: t,
+      messages: [],
+      mode: __cpSidepanelMode,
+      tabId: ce ?? null,
+      mainTabId: je ?? null,
+      updatedAt: Date.now()
+    });
+    await __cpRefreshSavedChats();
+  }, [__cpPersistedChatKey, __cpSidepanelMode, ce, je, dt, o, __cpSaveConversationSnapshot, __cpResetConversationView, __cpRefreshSavedChats]);
+  const __cpSwitchConversation = a.useCallback(async e => {
+    if (!e || e === o.sessionId || !__cpPersistedChatKey) {
+      return;
+    }
+    await __cpSaveConversationSnapshot(o.sessionId, dt);
+    const t = await __cpGetPersistedChatBySessionId(e);
+    if (!t) {
+      return;
+    }
+    await __cpActivatePersistedChat(__cpPersistedChatKey, e);
+    await __cpResetConversationView();
+    o.setSessionId(t.sessionId);
+    __cpSetMessages(__cpClonePersistedChatMessages(t.messages));
+    await __cpRefreshSavedChats();
+  }, [__cpPersistedChatKey, dt, o, __cpSaveConversationSnapshot, __cpResetConversationView, __cpSetMessages, __cpRefreshSavedChats]);
   (function (e, t) {
     a.useEffect(() => {
       const n = new URLSearchParams(window.location.search);
@@ -93829,6 +94280,80 @@ function o1() {
       }
     }, [n, s, e, t, i]);
   })(dt, xt);
+  a.useEffect(() => {
+    __cpRefreshSavedChats();
+    if (!chrome.storage?.onChanged) {
+      return;
+    }
+    const e = (e, t) => {
+      if (t === "local" && (__CP_PERSISTED_CHAT_SESSIONS_KEY in e || __CP_PERSISTED_CHAT_CONTEXTS_KEY in e)) {
+        __cpRefreshSavedChats();
+      }
+    };
+    chrome.storage.onChanged.addListener(e);
+    return () => chrome.storage.onChanged.removeListener(e);
+  }, [__cpRefreshSavedChats]);
+  a.useEffect(() => {
+    if (__cpPersistedChatKeyRef.current !== __cpPersistedChatKey) {
+      __cpPersistedChatKeyRef.current = __cpPersistedChatKey;
+      __cpPersistedChatHydratedRef.current = false;
+    }
+  }, [__cpPersistedChatKey]);
+  a.useEffect(() => {
+    if (!__cpPersistedChatKey || __cpPersistedChatHydratedRef.current) {
+      return;
+    }
+    let e = false;
+    (async () => {
+      try {
+        const t = await __cpLoadPersistedChat(__cpPersistedChatKey);
+        if (e) {
+          return;
+        }
+        if (t && Array.isArray(t.messages) && dt.length === 0) {
+          if (typeof t.sessionId == "string" && t.sessionId) {
+            o.setSessionId(t.sessionId);
+          }
+          __cpSetMessages(__cpClonePersistedChatMessages(t.messages));
+        }
+      } catch (t) {} finally {
+        if (!e) {
+          __cpPersistedChatHydratedRef.current = true;
+          __cpRefreshSavedChats();
+        }
+      }
+    })();
+    return () => {
+      e = true;
+    };
+  }, [__cpPersistedChatKey, dt.length, o, __cpSetMessages, __cpRefreshSavedChats]);
+  a.useEffect(() => {
+    if (!__cpPersistedChatKey || !__cpPersistedChatHydratedRef.current || !Array.isArray(dt) || dt.length === 0) {
+      return;
+    }
+    const e = setTimeout(() => {
+      __cpSaveConversationSnapshot(o.sessionId, dt).catch(() => {});
+    }, 150);
+    return () => {
+      clearTimeout(e);
+    };
+  }, [__cpPersistedChatKey, dt, o.sessionId, __cpSaveConversationSnapshot]);
+  a.useEffect(() => {
+    if (!__cpPersistedChatKey || !__cpPersistedChatHydratedRef.current) {
+      return;
+    }
+    const e = () => {
+      if (document.visibilityState === "hidden" && Array.isArray(dt) && dt.length > 0) {
+        __cpSaveConversationSnapshot(o.sessionId, dt).catch(() => {});
+      }
+    };
+    document.addEventListener("visibilitychange", e);
+    window.addEventListener("pagehide", e);
+    return () => {
+      document.removeEventListener("visibilitychange", e);
+      window.removeEventListener("pagehide", e);
+    };
+  }, [__cpPersistedChatKey, dt, o.sessionId, __cpSaveConversationSnapshot]);
   const Nt = O;
   const At = a.useMemo(() => {
     try {
@@ -94821,23 +95346,21 @@ function o1() {
     hasBrowserControlPermission: Ce
   });
   const an = a.useCallback(() => {
-    sn();
-    const e = () => {
-      yt();
-      o.generateNewSessionId();
-      R(new Map());
-      r.resetOnSessionClear();
+    const e = async () => {
+      await __cpCreateNewConversation(true);
       setTimeout(() => {
         Re.current?.focus();
       }, 50);
     };
     if (xt) {
       ft();
-      setTimeout(e, 100);
+      setTimeout(() => {
+        e().catch(() => {});
+      }, 100);
     } else {
-      e();
+      e().catch(() => {});
     }
-  }, [xt, ft, yt, sn, R, o, r]);
+  }, [xt, ft, __cpCreateNewConversation]);
   const cn = a.useCallback(async () => {
     await ee("enabled");
     r.setShowNotificationBanner(false);
@@ -95035,7 +95558,20 @@ function o1() {
         })]
       }), l.jsxs("div", {
         className: "flex flex-col h-screen bg-bg-100 relative overflow-hidden",
-        children: [!Lt.isRecording && !r.showWorkflowModeSelectionModal && l.jsx(jX, {
+        children: [!Lt.isRecording && !r.showWorkflowModeSelectionModal && l.jsxs(l.Fragment, {
+          children: [l.jsx(__cpConversationSwitcherModal, {
+            isOpen: __cpConversationSwitcherOpen,
+            onClose: () => __cpSetConversationSwitcherOpen(false),
+            chats: __cpSavedChats,
+            activeSessionId: o.sessionId,
+            onSelectChat: __cpSwitchConversation,
+            onCreateChat: async () => {
+              await __cpCreateNewConversation(false);
+              setTimeout(() => {
+                Re.current?.focus();
+              }, 50);
+            }
+          }), l.jsx(jX, {
           showModelSelector: true,
           selectedModel: D,
           onModelChange: P,
@@ -95049,6 +95585,7 @@ function o1() {
           onOpenOptions: () => chrome.runtime.openOptionsPage(),
           hasMessages: dt.length > 0,
           isPurlMode: !hasCustomProviderAuth_ && te && !!ne,
+          onOpenConversationSwitcher: () => __cpSetConversationSwitcherOpen(true),
           analytics: He,
           onTogglePurlMode: te && !hasCustomProviderAuth_ ? () => {
             if (ne) {
@@ -95058,6 +95595,7 @@ function o1() {
             }
             ie(true);
           } : undefined
+        })]
         }), r.showWorkflowModeSelectionModal ? l.jsx(UX, {
           isOpen: true,
           onVoiceOver: async () => {
