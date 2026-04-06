@@ -231,6 +231,23 @@
       return fallback;
     }
   }
+  function stringifyErrorDetails(error) {
+    if (error == null) {
+      return "";
+    }
+    if (typeof error === "string") {
+      return error;
+    }
+    try {
+      return JSON.stringify(error);
+    } catch {
+      try {
+        return String(error);
+      } catch {
+        return "";
+      }
+    }
+  }
   function stringifyContent(value) {
     if (typeof value === "string") {
       return value;
@@ -255,17 +272,25 @@
   }
   function buildProviderRequestCandidates(config, body) {
     const requestedFormat = normalizeFormat(config?.format);
-    const candidates = [{
+    const isNonStreamingRequest = body?.stream !== true;
+    const candidates = [];
+    if (requestedFormat === OPENAI_RESPONSES_FORMAT && isNonStreamingRequest && isChatLikeProvider(config, body)) {
+      candidates.push({
+        format: OPENAI_CHAT_FORMAT,
+        reason: "non_stream_prefer_chat"
+      });
+    }
+    candidates.push({
       format: requestedFormat,
       reason: "configured_format"
-    }];
+    });
     if (requestedFormat === OPENAI_RESPONSES_FORMAT && isChatLikeProvider(config, body) && !/\/responses$/i.test(String(config?.baseUrl || ""))) {
       candidates.push({
         format: OPENAI_CHAT_FORMAT,
         reason: "responses_fallback_to_chat"
       });
     }
-    return candidates;
+    return candidates.filter((candidate, index, list) => list.findIndex(item => item.format === candidate.format) === index);
   }
   function buildAnthropicUsageFromChat(usage) {
     const inputTokens = Number(usage?.prompt_tokens || 0);
@@ -584,11 +609,18 @@
     return result;
   }
   function openAIChatToAnthropic(body) {
-    const choice = Array.isArray(body?.choices) ? body.choices[0] : null;
-    if (!choice || !choice.message) {
+    const responseBody = body?.response && typeof body.response === "object" ? body.response : body;
+    const choice = Array.isArray(responseBody?.choices) ? responseBody.choices[0] : null;
+    const fallbackContent = typeof choice?.text === "string" ? choice.text : typeof choice?.delta?.content === "string" ? choice.delta.content : typeof responseBody?.output_text === "string" ? responseBody.output_text : "";
+    const message = choice?.message && typeof choice.message === "object" ? choice.message : choice ? {
+      content: fallbackContent,
+      tool_calls: Array.isArray(choice?.tool_calls) ? choice.tool_calls : Array.isArray(choice?.delta?.tool_calls) ? choice.delta.tool_calls : [],
+      function_call: choice?.function_call || choice?.delta?.function_call,
+      refusal: choice?.refusal || choice?.delta?.refusal || ""
+    } : null;
+    if (!choice || !message) {
       throw new Error("OpenAI Chat 响应里缺少 choices[0].message。");
     }
-    const message = choice.message;
     const content = [];
     let hasToolUse = false;
     if (typeof message.content === "string") {
@@ -644,14 +676,14 @@
       }
     }
     return {
-      id: String(body?.id || ""),
+      id: String(responseBody?.id || ""),
       type: "message",
       role: "assistant",
       content,
-      model: String(body?.model || ""),
+      model: String(responseBody?.model || ""),
       stop_reason: mapChatStopReason(choice.finish_reason, hasToolUse),
       stop_sequence: null,
-      usage: buildAnthropicUsageFromChat(body?.usage || {})
+      usage: buildAnthropicUsageFromChat(responseBody?.usage || {})
     };
   }
   function convertMessagesToResponsesInput(messages) {
@@ -798,21 +830,25 @@
     return result;
   }
   function openAIResponsesToAnthropic(body) {
-    const output = Array.isArray(body?.output) ? body.output : null;
+    const responseBody = body?.response && typeof body.response === "object" ? body.response : body;
+    const output = Array.isArray(responseBody?.output) ? responseBody.output : null;
     if (!output) {
-      if (typeof body?.output_text === "string" && body.output_text) {
+      if (Array.isArray(responseBody?.choices)) {
+        return openAIChatToAnthropic(responseBody);
+      }
+      if (typeof responseBody?.output_text === "string" && responseBody.output_text) {
         return {
-          id: String(body?.id || ""),
+          id: String(responseBody?.id || ""),
           type: "message",
           role: "assistant",
           content: [{
             type: "text",
-            text: body.output_text
+            text: responseBody.output_text
           }],
-          model: String(body?.model || ""),
-          stop_reason: mapResponsesStopReason(body?.status, false, body?.incomplete_details?.reason),
+          model: String(responseBody?.model || ""),
+          stop_reason: mapResponsesStopReason(responseBody?.status, false, responseBody?.incomplete_details?.reason),
           stop_sequence: null,
-          usage: buildAnthropicUsageFromResponses(body?.usage || {})
+          usage: buildAnthropicUsageFromResponses(responseBody?.usage || {})
         };
       }
       throw new Error("OpenAI Responses 响应里缺少 output。");
@@ -824,7 +860,7 @@
       if (type === "message") {
         for (const block of Array.isArray(item.content) ? item.content : []) {
           const blockType = block?.type || "";
-          if (blockType === "output_text" && typeof block.text === "string" && block.text) {
+          if ((blockType === "output_text" || blockType === "text" || blockType === "input_text") && typeof block.text === "string" && block.text) {
             content.push({
               type: "text",
               text: block.text
@@ -864,14 +900,14 @@
       }
     }
     return {
-      id: String(body?.id || ""),
+      id: String(responseBody?.id || ""),
       type: "message",
       role: "assistant",
       content,
-      model: String(body?.model || ""),
-      stop_reason: mapResponsesStopReason(body?.status, hasToolUse, body?.incomplete_details?.reason),
+      model: String(responseBody?.model || ""),
+      stop_reason: mapResponsesStopReason(responseBody?.status, hasToolUse, responseBody?.incomplete_details?.reason),
       stop_sequence: null,
-      usage: buildAnthropicUsageFromResponses(body?.usage || {})
+      usage: buildAnthropicUsageFromResponses(responseBody?.usage || {})
     };
   }
   function sseChunk(eventName, payload) {
@@ -1963,7 +1999,9 @@
       debugLog("provider.request_exception", {
         format: config.format,
         baseUrl: config.baseUrl,
+        name: typeof error?.name === "string" ? error.name : "",
         message: error && typeof error.message === "string" ? error.message : String(error || ""),
+        details: stringifyErrorDetails(error),
         stack: error?.stack || ""
       }, "error");
       return createAnthropicErrorResponse(500, error && typeof error.message === "string" ? error.message : "自定义供应商协议转换失败。");

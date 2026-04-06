@@ -927,7 +927,7 @@ class B {
   async getGroupDetails(e) {
     const t = this.groupMetadata.get(e);
     if (!t) {
-      throw new Error(`No group found for main tab ${e}`);
+      return null;
     }
     const r = await this.getGroupMembers(t.chromeGroupId);
     return {
@@ -1416,7 +1416,11 @@ class B {
       if (!t) {
         return [e];
       }
-      return (await this.getGroupDetails(t)).memberTabs.map(e => e.tabId);
+      const r = await this.getGroupDetails(t);
+      if (!r) {
+        return [e];
+      }
+      return r.memberTabs.map(e => e.tabId);
     } catch (t) {
       return [e];
     }
@@ -1489,16 +1493,20 @@ class B {
     this.queueIndicatorUpdate(e, t);
   }
   async setGroupIndicatorState(e, t) {
-    const r = await this.getGroupDetails(e);
+    const r = await this.findGroupByMainTab(e);
+    if (!r) {
+      return;
+    }
     if (t === "pulsing") {
       await this.setTabIndicatorState(e, "pulsing");
     } else {
       await this.setTabIndicatorState(e, t);
     }
-    for (const o of r.memberTabs) {
-      if (o.tabId !== e) {
+    const o = await this.getGroupMembers(r.chromeGroupId);
+    for (const r of o) {
+      if (r.tabId !== e) {
         const e = t === "none" ? "none" : "static";
-        await this.setTabIndicatorState(o.tabId, e);
+        await this.setTabIndicatorState(r.tabId, e);
       }
     }
   }
@@ -1512,11 +1520,15 @@ class B {
     return "none";
   }
   async showSecondaryTabIndicators(e) {
-    const t = await this.getGroupDetails(e);
+    const t = await this.findGroupByMainTab(e);
+    if (!t) {
+      return;
+    }
     if (!(await this.isGroupDismissed(t.chromeGroupId))) {
-      for (const r of t.memberTabs) {
-        if (r.tabId !== e) {
-          await this.setTabIndicatorState(r.tabId, "static");
+      const r = await this.getGroupMembers(t.chromeGroupId);
+      for (const o of r) {
+        if (o.tabId !== e) {
+          await this.setTabIndicatorState(o.tabId, "static");
         }
       }
       await this.processIndicatorQueue();
@@ -1556,6 +1568,9 @@ class B {
   async hideSecondaryTabIndicators(e) {
     try {
       const t = await this.getGroupDetails(e);
+      if (!t) {
+        return;
+      }
       for (const r of t.memberTabs) {
         if (r.tabId !== e) {
           await this.setTabIndicatorState(r.tabId, "none");
@@ -1611,7 +1626,9 @@ class B {
     } catch (t) {}
   }
   async startRunning(e) {
-    await this.setGroupIndicatorState(e, "pulsing");
+    try {
+      await this.setGroupIndicatorState(e, "pulsing");
+    } catch {}
   }
   async stopRunning() {
     for (const [, e] of this.groupMetadata.entries()) {
@@ -7044,7 +7061,7 @@ const Ne = {
   description: "Call this immediately before your text response to the user for this turn. Required every turn - whether or not you made tool calls. After calling, write your response. No more tools after this.",
   parameters: Ge,
   execute: async () => ({
-    output: "Proceed with your response."
+    output: ""
   }),
   toAnthropicSchema() {
     return {
@@ -13524,4 +13541,3 @@ function Cn() {
   }
 }
 export { Ua as $, Ze as A, we as B, ua as C, pa as D, Q as E, Fe as F, qe as G, ee as H, fa as I, te as J, K, J as L, Be as M, R as N, Ya as O, en as P, Ja as Q, tn as R, Za as S, rn as T, ce as U, le as V, O as W, oe as X, Tn as Y, bn as Z, wn as _, ve as a, Pa as a0, Fa as a1, Cn as a2, Te as a3, $a as a4, Oa as a5, ie as b, Y as c, se as d, x as e, _e as f, N as g, pe as h, De as i, Ie as j, je as k, Oe as l, $e as m, Le as n, He as o, re as p, ye as q, Pe as r, Z as s, F as t, Ke as u, Re as v, Ae as w, Ue as x, Ee as y, Ne as z };
-

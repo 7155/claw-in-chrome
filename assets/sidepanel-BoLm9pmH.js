@@ -36708,8 +36708,9 @@ const sk = a.memo(function ({
   });
   const O = typeof e.content == "string" ? e.content : N.map(e => e.text).join("");
   const I = _ ? O : ft(O);
+  const __cpVisibleUserText = e.role === "user" ? __cpStripPersistedNoise(I) : I;
   const R = async () => {
-    if (I) {
+    if (__cpVisibleUserText) {
       const e = await async function (e) {
         if (!e.includes("[[shortcut:")) {
           return e;
@@ -36724,7 +36725,7 @@ const sk = a.memo(function ({
             return `/${s}`;
           }
         });
-      }(I);
+      }(__cpVisibleUserText);
       await navigator.clipboard.writeText(e);
       j(true);
       setTimeout(() => j(false), 2000);
@@ -36761,14 +36762,20 @@ const sk = a.memo(function ({
     screenshotsByTab: F
   } = n;
   if (e.role === "user") {
-    const t = Array.isArray(e.content) ? e.content.filter(e => e.type === "tool_result") : [];
-    const n = t.length > 0 && !I;
+    const t = Array.isArray(e.content) ? e.content.filter(e => e.type === "tool_result").filter(e => {
+      const t = __cpStripPersistedNoise(__cpExtractPersistedChatText(e.content));
+      return !__cpIsLowSignalPersistedText(t);
+    }) : [];
+    const n = t.length > 0 && !__cpVisibleUserText;
+    if (!__cpVisibleUserText && L.length === 0 && t.length === 0) {
+      return null;
+    }
     return l.jsxs("div", {
       className: Le(n ? "w-full py-3" : "flex justify-end", "group"),
       children: [l.jsxs("div", {
         className: n ? "w-full" : "flex flex-col items-end max-w-[85%] min-w-0",
         children: [L.length > 0 && l.jsx("div", {
-          className: Le("flex flex-wrap gap-2 justify-end", I ? "mb-2" : "py-5"),
+          className: Le("flex flex-wrap gap-2 justify-end", __cpVisibleUserText ? "mb-2" : "py-5"),
           children: L.map((e, t) => {
             const n = e;
             if (n.source?.type === "base64") {
@@ -36791,18 +36798,18 @@ const sk = a.memo(function ({
             return null;
           })
         }), l.jsx("div", {
-          className: Le("relative inline-flex flex-col break-words max-w-full", I && t.length == 0 ? "px-4 py-3 bg-bg-300 rounded-[14px]" : "w-full"),
-          children: I && l.jsxs("div", {
-            className: Le("relative transition-all duration-300 ease-in-out", t.length > 0 && "ml-auto px-4 py-3 bg-bg-300 rounded-[14px]", !x && I.length > 500 && "max-h-[300px] overflow-hidden", x && I.length > 500 && "max-h-[50000px] overflow-hidden"),
-            children: [nk(I) ? l.jsx("div", {
+          className: Le("relative inline-flex flex-col break-words max-w-full", __cpVisibleUserText && t.length == 0 ? "px-4 py-3 bg-bg-300 rounded-[14px]" : "w-full"),
+          children: __cpVisibleUserText && l.jsxs("div", {
+            className: Le("relative transition-all duration-300 ease-in-out", t.length > 0 && "ml-auto px-4 py-3 bg-bg-300 rounded-[14px]", !x && __cpVisibleUserText.length > 500 && "max-h-[300px] overflow-hidden", x && __cpVisibleUserText.length > 500 && "max-h-[50000px] overflow-hidden"),
+            children: [nk(__cpVisibleUserText) ? l.jsx("div", {
               className: "font-base",
-              children: tk(I, h)
+              children: tk(__cpVisibleUserText, h)
             }) : l.jsx(Zw, {
-              text: I,
+              text: __cpVisibleUserText,
               variant: "user"
-            }), !x && I.length > 500 && l.jsx("div", {
+            }), !x && __cpVisibleUserText.length > 500 && l.jsx("div", {
               className: "absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-bg-300 to-transparent pointer-events-none transition-opacity duration-300"
-            }), I.length > 500 && l.jsx("button", {
+            }), __cpVisibleUserText.length > 500 && l.jsx("button", {
               onClick: () => w(!x),
               className: "absolute bottom-0.5 right-0 p-1.5 bg-bg-500 hover:bg-bg-200 rounded-full transition-colors border-[0.5px] border-border-400/50 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto",
               "aria-label": x ? g.formatMessage({
@@ -36821,7 +36828,7 @@ const sk = a.memo(function ({
               })
             })]
           })
-        }), I && l.jsx("div", {
+        }), __cpVisibleUserText && l.jsx("div", {
           className: "h-7 flex justify-end items-center",
           children: l.jsxs("div", {
             className: "flex items-center gap-0.5 pr-1 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto",
@@ -36832,7 +36839,7 @@ const sk = a.memo(function ({
               }),
               side: "bottom",
               children: l.jsx("button", {
-                onClick: () => d(I),
+                onClick: () => d(__cpVisibleUserText),
                 className: "p-1.5 rounded-md transition-colors text-text-300 hover:bg-bg-300 hover:text-text-100",
                 "aria-label": g.formatMessage({
                   defaultMessage: "Save as shortcut",
@@ -85975,14 +85982,7 @@ class WX {
       content: o
     });
     try {
-      const t = await this.createMessage({
-        maxTokens: 10000,
-        messages: a,
-        system: [{
-          type: "text",
-          text: "You are a helpful AI assistant tasked with summarizing browser automation conversations."
-        }]
-      });
+      const t = await this.createCompactionMessage(a);
       const s = function (e, t) {
         const n = function (e) {
           let t = e;
@@ -86038,6 +86038,10 @@ class WX {
         tokensSaved: Math.max(0, i - d)
       };
     } catch (a) {
+      const t = this.buildFallbackCompactionResult(e, i, n, a);
+      if (t) {
+        return t;
+      }
       throw new Error(`Failed to compact conversation: ${a}`);
     }
   }
@@ -86058,6 +86062,146 @@ class WX {
       });
     }
     return t;
+  }
+  async createCompactionMessage(e) {
+    const t = {
+      maxTokens: 10000,
+      messages: e,
+      system: [{
+        type: "text",
+        text: "You are a helpful AI assistant tasked with summarizing browser automation conversations."
+      }]
+    };
+    const n = await this.resolveCustomCompactionProviderConfig();
+    if (n) {
+      try {
+        return await this.callCustomProviderForCompaction(t, n);
+      } catch (s) {}
+    }
+    return await this.createMessage(t);
+  }
+  async resolveCustomCompactionProviderConfig() {
+    try {
+      const {
+        customProviderConfig: e
+      } = await chrome.storage.local.get("customProviderConfig");
+      if (!e?.enabled || !e?.baseUrl || !e?.apiKey) {
+        return null;
+      }
+      const t = String(e.baseUrl || "").trim().replace(/\/+$/, "");
+      const n = String(e.apiKey || "").trim();
+      if (!t || !n) {
+        return null;
+      }
+      const s = String(e.defaultModel || "").trim();
+      const r = __cpNormalizeReasoningEffort(e.reasoningEffort);
+      return {
+        baseUrl: t,
+        apiKey: n,
+        model: s || "gpt-5.4",
+        reasoningEffort: r
+      };
+    } catch {
+      return null;
+    }
+  }
+  buildCompactionChatUrl(e) {
+    if (/\/chat\/completions$/i.test(e)) {
+      return e;
+    }
+    if (/\/responses$/i.test(e)) {
+      return e.replace(/\/responses$/i, "/chat/completions");
+    }
+    return `${e}/chat/completions`;
+  }
+  toOpenAICompactionText(e) {
+    if (typeof e == "string") {
+      return e;
+    }
+    return this.extractTextFromContent(e);
+  }
+  buildOpenAICompactionMessages(e, t) {
+    const n = [];
+    if (Array.isArray(t)) {
+      for (const e of t) {
+        if (typeof e?.text == "string" && e.text.trim()) {
+          n.push({
+            role: "system",
+            content: e.text
+          });
+        }
+      }
+    } else if (typeof t == "string" && t.trim()) {
+      n.push({
+        role: "system",
+        content: t
+      });
+    }
+    for (const t of Array.isArray(e) ? e : []) {
+      if (!t || (t.role !== "user" && t.role !== "assistant")) {
+        continue;
+      }
+      const e = this.toOpenAICompactionText(t.content).trim();
+      if (!e) {
+        continue;
+      }
+      n.push({
+        role: t.role,
+        content: e
+      });
+    }
+    return n;
+  }
+  extractTextFromOpenAIChatResponse(e) {
+    const t = e?.choices?.[0]?.message;
+    if (!t) {
+      throw new Error("Compaction provider returned no chat message");
+    }
+    if (typeof t.content == "string" && t.content.trim()) {
+      return t.content;
+    }
+    if (Array.isArray(t.content)) {
+      const e = t.content.map(e => typeof e?.text == "string" ? e.text : typeof e?.content == "string" ? e.content : "").join("\n").trim();
+      if (e) {
+        return e;
+      }
+    }
+    throw new Error("Compaction provider returned empty chat content");
+  }
+  async callCustomProviderForCompaction(e, t) {
+    const n = this.buildOpenAICompactionMessages(e.messages, e.system);
+    const s = {
+      model: t.model,
+      messages: n,
+      max_tokens: e.maxTokens
+    };
+    if (t.reasoningEffort !== "none") {
+      s.reasoning_effort = t.reasoningEffort === "max" ? "high" : t.reasoningEffort;
+    }
+    const r = await fetch(this.buildCompactionChatUrl(t.baseUrl), {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${t.apiKey}`
+      },
+      body: JSON.stringify(s)
+    });
+    const i = await r.text();
+    let o = null;
+    try {
+      o = JSON.parse(i);
+    } catch {}
+    if (!r.ok) {
+      const e = o?.error?.message || o?.message || i || `HTTP ${r.status}`;
+      throw new Error(e);
+    }
+    const a = this.extractTextFromOpenAIChatResponse(o);
+    return {
+      content: [{
+        type: "text",
+        text: a
+      }]
+    };
   }
   extractTextFromResponse(e) {
     if (!e.content || e.content.length === 0) {
@@ -86086,6 +86230,194 @@ class WX {
           }
         }
       }
+    }
+    return t;
+  }
+  extractTextFromContent(e) {
+    if (typeof e == "string") {
+      return e.trim();
+    }
+    if (!Array.isArray(e)) {
+      return "";
+    }
+    return e.map(e => {
+      if (!e || typeof e != "object") {
+        return "";
+      }
+      if ("type" in e && e.type === "text" && typeof e.text == "string") {
+        return e.text;
+      }
+      if ("type" in e && e.type === "tool_result") {
+        return this.extractTextFromContent(e.content);
+      }
+      return "";
+    }).filter(Boolean).join(" ").trim();
+  }
+  stripCompactionNoise(e) {
+    if (typeof e != "string") {
+      return "";
+    }
+    return e.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, " ").replace(/\bProceed with your response\.\b/gi, " ").replace(/\bOutput exceeds \d+ character limit[\s\S]*?(?=(?:\n|$))/gi, " ").replace(/\bFailed to read page:[\s\S]*?(?=(?:\n|$))/gi, " ").replace(/\bThe conversation history was compressed to save context space\.[\s\S]*/gi, " ").replace(/\bThis conversation has been summarized so we can keep going\.\b/gi, " ").replace(/\s+/g, " ").trim();
+  }
+  isFallbackTelemetryText(e) {
+    if (typeof e != "string") {
+      return true;
+    }
+    const t = e.trim().toLowerCase();
+    if (!t) {
+      return true;
+    }
+    return /^no semantic content element found/.test(t) || /^\[blocked:/.test(t) || /^successfully captured screenshot/.test(t) || /^scrolled (down|up) by /.test(t) || /^clicked at /.test(t) || /^moved mouse /.test(t) || /^pressed key /.test(t) || /^typed /.test(t) || /^page title: /.test(t) || /^url: /.test(t);
+  }
+  isLowSignalContinuationText(e) {
+    if (typeof e != "string") {
+      return false;
+    }
+    const t = e.trim().toLowerCase();
+    return t === "继续" || t === "继续。" || t === "继续..." || t === "continue" || t === "continue." || t === "next" || t === "go on";
+  }
+  summarizeFallbackText(e, t) {
+    if (typeof e != "string") {
+      return "";
+    }
+    const n = e.trim();
+    const s = n.match(/^Title:\s*(.+?)\s+URL:\s*(https?:\/\/\S+)/i);
+    if (s) {
+      const r = this.truncateSummaryText(s[1], 120);
+      const i = s[2];
+      return t === "assistant" ? `Read page content from "${r}" (${i}).` : `Referenced page "${r}" (${i}).`;
+    }
+    return n;
+  }
+  shouldIncludeInFallbackSummary(e, t) {
+    if (!e || typeof e != "object") {
+      return false;
+    }
+    if (e.isCompactSummary || e.isCompactionMessage || e._synthetic || e._syntheticResult) {
+      return false;
+    }
+    const n = this.summarizeFallbackText(this.stripCompactionNoise(t), e.role);
+    if (!n) {
+      return false;
+    }
+    const s = n.toLowerCase();
+    if (s === "proceed with your response." || this.isFallbackTelemetryText(n) || this.isLowSignalContinuationText(n)) {
+      return false;
+    }
+    return true;
+  }
+  truncateSummaryText(e, t = 400) {
+    const n = typeof e == "string" ? e.trim().replace(/\s+/g, " ") : "";
+    if (n.length <= t) {
+      return n;
+    }
+    return `${n.slice(0, Math.max(0, t - 3)).trim()}...`;
+  }
+  buildFallbackCompactionResult(e, t, n, s) {
+    try {
+      const r = Array.isArray(e) ? e.filter(Boolean) : [];
+      const i = [];
+      const o = [];
+      for (const e of r) {
+        if (!e || !("role" in e)) {
+          continue;
+        }
+        const t = this.extractTextFromContent(e.content);
+        if (!this.shouldIncludeInFallbackSummary(e, t)) {
+          continue;
+        }
+        const n = this.summarizeFallbackText(this.stripCompactionNoise(t), e.role);
+        if (e.role === "user" && i.length < 8) {
+          i.push(this.truncateSummaryText(n, 600));
+        }
+        o.push({
+          role: e.role,
+          text: this.truncateSummaryText(n, 500)
+        });
+      }
+      const a = o.slice(-8);
+      const l = this.buildFallbackRecentMessages(r);
+      const c = [];
+      c.push("The conversation history was compressed to save context space.");
+      c.push("");
+      c.push("Automatic compaction failed, so this summary was generated locally from the conversation history.");
+      if (s) {
+        c.push(`Compaction error: ${this.truncateSummaryText(String(s), 300)}`);
+      }
+      if (i.length > 0) {
+        c.push("");
+        c.push("Key user instructions:");
+        i.forEach(e => {
+          c.push(`- ${e}`);
+        });
+      }
+      if (a.length > 0) {
+        c.push("");
+        c.push("Recent conversation context:");
+        a.forEach(e => {
+          c.push(`- ${e.role === "assistant" ? "Assistant" : "User"}: ${e.text}`);
+        });
+      }
+      c.push("");
+      if (n) {
+        c.push("I'll continue from where we left off without asking additional questions.");
+      } else {
+        c.push("How would you like to proceed?");
+      }
+      const u = c.join("\n").trim();
+      const d = {
+        role: "user",
+        content: u,
+        isCompactSummary: true
+      };
+      const h = l.length > 0 ? l : this.preserveRecentContext(r);
+      const p = [{
+        role: "assistant",
+        content: "This conversation has been summarized so we can keep going.",
+        isCompactionMessage: true
+      }, d, ...h];
+      const m = 1600;
+      const f = Math.round(u.length / 4 + h.reduce((e, t) => {
+        let n = 0;
+        if (typeof t.content == "string") {
+          n = t.content.length / 4;
+        } else if (Array.isArray(t.content)) {
+          n = t.content.filter(e => "type" in e && e.type === "image").length * m;
+          n += JSON.stringify(t.content.filter(e => "type" in e && e.type !== "image")).length / 4;
+        } else {
+          n = JSON.stringify(t.content).length / 4;
+        }
+        return e + n;
+      }, 0));
+      return {
+        summaryMessage: d,
+        messagesAfterCompacting: p,
+        preCompactTokenCount: t,
+        postCompactTokenCount: f,
+        tokensSaved: Math.max(0, t - f)
+      };
+    } catch {
+      return null;
+    }
+  }
+  buildFallbackRecentMessages(e) {
+    const t = [];
+    for (let n = e.length - 1; n >= 0 && t.length < 6; n--) {
+      const s = e[n];
+      if (!s || !("role" in s) || (s.role !== "user" && s.role !== "assistant")) {
+        continue;
+      }
+      if (s.isCompactSummary || s.isCompactionMessage || s._synthetic || s._syntheticResult) {
+        continue;
+      }
+      const r = this.summarizeFallbackText(this.stripCompactionNoise(this.extractTextFromContent(s.content)), s.role);
+      if (!r || this.isFallbackTelemetryText(r) || this.isLowSignalContinuationText(r)) {
+        continue;
+      }
+      t.unshift({
+        role: s.role,
+        content: this.truncateSummaryText(r, 1200)
+      });
     }
     return t;
   }
@@ -91258,6 +91590,19 @@ const __CP_PERSISTED_CHAT_CONTEXTS_KEY = "cp_persisted_chat_contexts";
 const __CP_SIDE_PANEL_LOCK_KEY = "cp_side_panel_locked";
 const __CP_PERSISTED_CHAT_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
 const __CP_PERSISTED_CHAT_MAX_SESSIONS = 50;
+function __cpStripPersistedNoise(e) {
+  if (typeof e != "string") {
+    return "";
+  }
+  return e.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, " ").replace(/\bProceed with your response\.\b/gi, " ").replace(/\s+/g, " ").trim();
+}
+function __cpIsLowSignalPersistedText(e) {
+  const t = __cpStripPersistedNoise(e).toLowerCase();
+  if (!t) {
+    return true;
+  }
+  return t === "继续" || t === "继续。" || t === "继续..." || t === "continue" || t === "continue." || t === "next" || t === "go on" || /^no semantic content element found/.test(t) || /^\[blocked:/.test(t) || /^successfully captured screenshot/.test(t) || /^scrolled (down|up) by /.test(t);
+}
 function __cpClonePersistedChatMessages(e) {
   if (!Array.isArray(e)) {
     return [];
@@ -91293,15 +91638,34 @@ function __cpSanitizePersistedChatMessages(e) {
   });
   const r = new Set(Array.from(n).filter(e => s.has(e)));
   return t.map(e => {
+    if (typeof e?.content == "string") {
+      const t = __cpStripPersistedNoise(e.content);
+      return {
+        ...e,
+        content: t
+      };
+    }
     if (!Array.isArray(e?.content)) {
       return e;
     }
-    const t = e.content.filter(t => {
+    const t = e.content.map(t => {
+      if (t?.type === "text" && typeof t.text == "string") {
+        return {
+          ...t,
+          text: __cpStripPersistedNoise(t.text)
+        };
+      }
+      return t;
+    }).filter(t => {
       if (t?.type === "tool_use") {
-        return !!t.id && r.has(String(t.id));
+        return t.name !== "turn_answer_start" && !!t.id && r.has(String(t.id));
       }
       if (t?.type === "tool_result") {
-        return !!t.tool_use_id && r.has(String(t.tool_use_id));
+        const e = __cpStripPersistedNoise(__cpExtractPersistedChatText(t.content));
+        return !!t.tool_use_id && r.has(String(t.tool_use_id)) && !__cpIsLowSignalPersistedText(e);
+      }
+      if (t?.type === "text") {
+        return !__cpIsLowSignalPersistedText(t.text);
       }
       return true;
     });
@@ -91311,7 +91675,7 @@ function __cpSanitizePersistedChatMessages(e) {
     };
   }).filter(e => {
     if (typeof e?.content === "string") {
-      return true;
+      return !__cpIsLowSignalPersistedText(e.content);
     }
     if (Array.isArray(e?.content)) {
       return e.content.length > 0;
@@ -94720,27 +95084,31 @@ function o1() {
           if (!e) {
             return;
           }
-          await gt.initialize();
-          const s = await gt.isInGroup(e);
-          const r = gt.isMainTab(e);
-          let i;
-          i = s ? r ? e : (await gt.getMainTabId(e)) || e : e;
-          if (n && t) {
-            setTimeout(async () => {
+          try {
+            await gt.initialize();
+            const s = await gt.isInGroup(e);
+            const r = gt.isMainTab(e);
+            let i;
+            i = s ? r ? e : (await gt.getMainTabId(e)) || e : e;
+            if (n && t) {
+              setTimeout(async () => {
+                try {
+                  await chrome.tabs.sendMessage(i, {
+                    type: "SHOW_AGENT_INDICATORS"
+                  });
+                } catch (Ct) {}
+              }, 300);
+              await gt.startRunning(i);
+            } else if (!t || !n) {
               try {
                 await chrome.tabs.sendMessage(i, {
-                  type: "SHOW_AGENT_INDICATORS"
+                  type: "HIDE_AGENT_INDICATORS"
                 });
               } catch (Ct) {}
-            }, 300);
-            await gt.startRunning(i);
-          } else if (!t || !n) {
-            try {
-              await chrome.tabs.sendMessage(i, {
-                type: "HIDE_AGENT_INDICATORS"
-              });
-            } catch (Ct) {}
-            await gt.stopRunning();
+              await gt.stopRunning();
+            }
+          } catch (Ct) {
+            console.debug("Failed to sync agent indicator state", Ct);
           }
         })();
       }
