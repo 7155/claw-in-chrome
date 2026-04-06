@@ -86336,7 +86336,6 @@ class WX {
         });
       }
       const a = o.slice(-8);
-      const l = this.buildFallbackRecentMessages(r);
       const c = [];
       c.push("The conversation history was compressed to save context space.");
       c.push("");
@@ -86370,7 +86369,7 @@ class WX {
         content: u,
         isCompactSummary: true
       };
-      const h = l.length > 0 ? l : this.preserveRecentContext(r);
+      const h = this.preserveRecentContext(r);
       const p = [{
         role: "assistant",
         content: "This conversation has been summarized so we can keep going.",
